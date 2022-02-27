@@ -356,7 +356,17 @@ void FUNC(fulcrum_partition)(VAR *array, VAR *swap, VAR *ptx, size_t swap_size, 
 
 		if (a_size && cmp(&old, &piv) <= 0)
 		{
-			a_size = FUNC(fulcrum_reverse_partition)(array, swap, array, &piv, swap_size, nmemb, cmp);
+			s_size = 0;
+		}
+		else
+		{
+			a_size = FUNC(fulcrum_default_partition)(array, swap, array, &piv, swap_size, nmemb, cmp);
+			s_size = nmemb - a_size;
+		}
+
+		if (s_size == 0)
+		{
+			a_size = FUNC(fulcrum_reverse_partition)(array, swap, array, &piv, swap_size, a_size, cmp);
 			s_size = nmemb - a_size;
 
 			if (s_size <= a_size / 16 || a_size <= CRUM_OUT)
@@ -369,25 +379,8 @@ void FUNC(fulcrum_partition)(VAR *array, VAR *swap, VAR *ptx, size_t swap_size, 
 			}
 		}
 
-		a_size = FUNC(fulcrum_default_partition)(array, swap, array, &piv, swap_size, nmemb, cmp);
-		s_size = nmemb - a_size;
-
 		if (a_size <= s_size / 16 || s_size <= CRUM_OUT)
 		{
-			if (s_size == 0)
-			{
-				a_size = FUNC(fulcrum_reverse_partition)(array, swap, array, &piv, swap_size, a_size, cmp);
-				s_size = nmemb - a_size;
-
-				if (s_size <= a_size / 16 || a_size <= CRUM_OUT)
-				{
-					return FUNC(quadsort_swap)(array, swap, swap_size, a_size, cmp);
-				}
-				else
-				{
-					return FUNC(fulcrum_partition)(array, swap, array, swap_size, a_size, cmp);
-				}
-			}
 			FUNC(quadsort_swap)(array + a_size, swap, swap_size, s_size, cmp);
 		}
 		else
