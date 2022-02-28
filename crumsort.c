@@ -339,6 +339,11 @@ void FUNC(fulcrum_partition)(VAR *array, VAR *swap, VAR *ptx, size_t swap_size, 
 
 	while (1)
 	{
+#ifdef IS32
+		unsigned int range = array[nmemb]-array[-1];
+		if (nmemb<=(1<<16) && range<(1<<16)) return radpack32(array, nmemb, array[-1]);
+#endif
+
 		VAR *ppiv = FUNC(crum_median_of_nine)(array, nmemb, cmp);
                 VAR piv = *ppiv;
 

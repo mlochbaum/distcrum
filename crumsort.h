@@ -104,7 +104,10 @@ typedef int CMPFUNC (const void *a, const void *b);
 #define FUNC(NAME) NAME##32
 #define STRUCT(NAME) struct NAME##32
 
+#define IS32
+#include "radix.c"
 #include "crumsort.c"
+#undef IS32
 
 //////////////////////////////////////////////////////////
 // ┌───────────────────────────────────────────────────┐//
