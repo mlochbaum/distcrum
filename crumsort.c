@@ -85,26 +85,41 @@ size_t FUNC(crum_analyze)(VAR *array, VAR *swap, size_t swap_size, size_t nmemb,
 	return 0;
 }
 
-VAR *FUNC(crum_median_of_sqrt)(VAR *array, VAR *swap, size_t swap_size, size_t nmemb, CMPFUNC *cmp)
+VAR *FUNC(crum_median_of_sqrt)(VAR *ptx, VAR *swap, size_t swap_size, size_t nmemb, CMPFUNC *cmp)
 {
-	VAR *pta, *pts, *ptx;
-	size_t cnt, sqrt, div;
+	VAR *pta, *pts;
+	size_t log2, nt, div, cnt, i;
+	unsigned seed, mask;
+	pts = pta = ptx;
 
-	sqrt = nmemb > 262144 ? 256 : 128;
+	// Set log2 to 1 + floor(log2(nmemb))
+	log2 = 14;
+	for (nt = nmemb >> log2 ; nt ; nt /= 2) log2++;
 
-	div = nmemb / sqrt;
+	// Set div to about sqrt(2 * nmemb * (2 + log2))
+	nt = (nmemb / 128) * (2 + log2); // Divide by 256 for overflow
+	div = 1 << (3 + log2 / 2);
+	for (i = 0 ; i < 5 ; i++) div = (div + nt / div) / 2;
+	div *= 16;
 
-	pta = pts = ptx = array + rand() % sqrt;
-
-	for (cnt = 0 ; cnt < sqrt ; cnt++)
+	seed = nmemb;
+	mask = (1 << (2 + log2 / 2)) - 1;  // < div
+	for (i = 0 ; i < nmemb - (mask + 2 * div); )
 	{
-		swap[0] = *pts; *pts++ = *pta; *pta = swap[0];
-
-		pta += div;
+		seed ^= seed << 13;
+		pta = ptx + i + (seed & mask); swap[0] = *pts; *pts++ = *pta; *pta = swap[0];
+		i += div;
+		seed ^= seed >> 17;
+		pta = ptx + i + (seed & mask); swap[0] = *pts; *pts++ = *pta; *pta = swap[0];
+		i += div;
+		seed ^= seed << 5;
+		pta = ptx + i + (seed & mask); swap[0] = *pts; *pts++ = *pta; *pta = swap[0];
+		i += div;
 	}
-	FUNC(quadsort_swap)(ptx, swap, swap_size, sqrt, cmp);
+	cnt = pts - ptx;
+	FUNC(quadsort_swap)(ptx, swap, swap_size, cnt, cmp);
 
-	return ptx + sqrt / 2;
+	return ptx + cnt / 2;
 }
 
 VAR *FUNC(crum_median_of_five)(VAR *array, size_t v0, size_t v1, size_t v2, size_t v3, size_t v4, CMPFUNC *cmp)
@@ -345,7 +360,7 @@ void FUNC(fulcrum_partition)(VAR *array, VAR *swap, size_t swap_size, size_t nme
 		{
 			ptp = FUNC(crum_median_of_nine)(array, nmemb, cmp);
 		}
-		else if (nmemb <= 65536)
+		else if (nmemb <= 16384)
 		{
 			ptp = FUNC(crum_median_of_twentyfive)(array, nmemb, cmp);
 		}
