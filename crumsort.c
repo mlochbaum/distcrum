@@ -85,12 +85,12 @@ size_t FUNC(crum_analyze)(VAR *array, VAR *swap, size_t swap_size, size_t nmemb,
 	return 0;
 }
 
-VAR *FUNC(crum_median_of_sqrt)(VAR *ptx, VAR *swap, size_t swap_size, size_t nmemb, CMPFUNC *cmp)
+size_t FUNC(crum_sort_sqrt)(VAR *array, VAR *swap, size_t swap_size, size_t nmemb, CMPFUNC *cmp)
 {
-	VAR *pta, *pts;
+	VAR *ptx, *pta, *pts;
 	size_t log2, nt, div, cnt, i;
 	unsigned seed, mask;
-	pts = pta = ptx;
+	pts = ptx = array + nmemb;
 
 	// Set log2 to 1 + floor(log2(nmemb))
 	log2 = 11;
@@ -104,22 +104,22 @@ VAR *FUNC(crum_median_of_sqrt)(VAR *ptx, VAR *swap, size_t swap_size, size_t nme
 
 	seed = nmemb;
 	mask = (1 << (2 + log2 / 2)) - 1;  // < div
-	for (i = 0 ; i < nmemb - (mask + 2 * div); )
+	for (i = nmemb ; i >= 3 * div ; )
 	{
+		i -= div; pts--;
 		seed ^= seed << 13;
-		pta = ptx + i + (seed & mask); swap[0] = *pts; *pts++ = *pta; *pta = swap[0];
-		i += div;
+		pta = array + i + (seed & mask); swap[0] = *pts; *pts = *pta; *pta = swap[0];
+		i -= div; pts--;
 		seed ^= seed >> 17;
-		pta = ptx + i + (seed & mask); swap[0] = *pts; *pts++ = *pta; *pta = swap[0];
-		i += div;
+		pta = array + i + (seed & mask); swap[0] = *pts; *pts = *pta; *pta = swap[0];
+		i -= div; pts--;
 		seed ^= seed << 5;
-		pta = ptx + i + (seed & mask); swap[0] = *pts; *pts++ = *pta; *pta = swap[0];
-		i += div;
+		pta = array + i + (seed & mask); swap[0] = *pts; *pts = *pta; *pta = swap[0];
 	}
-	cnt = pts - ptx;
-	FUNC(quadsort_swap)(ptx, swap, swap_size, cnt, cmp);
+	cnt = ptx - pts;
+	FUNC(quadsort_swap)(pts, swap, swap_size, cnt, cmp);
 
-	return ptx + cnt / 2;
+	return cnt;
 }
 
 size_t FUNC(crum_median_of_three)(VAR *array, size_t v0, size_t v1, size_t v2, CMPFUNC *cmp)
@@ -134,7 +134,7 @@ size_t FUNC(crum_median_of_three)(VAR *array, size_t v0, size_t v1, size_t v2, C
 	return v[(x == y) + (y ^ z)];
 }
 
-VAR *FUNC(crum_median_of_nine)(VAR *array, size_t nmemb, CMPFUNC *cmp)
+size_t FUNC(crum_median_of_nine)(VAR *array, size_t nmemb, CMPFUNC *cmp)
 {
 	size_t x, y, z, div = nmemb / 16;
 
@@ -142,7 +142,9 @@ VAR *FUNC(crum_median_of_nine)(VAR *array, size_t nmemb, CMPFUNC *cmp)
 	y = FUNC(crum_median_of_three)(array, div * 8, div * 6, div * 10, cmp);
 	z = FUNC(crum_median_of_three)(array, div * 14, div * 12, div * 15, cmp);
 
-	return array + FUNC(crum_median_of_three)(array, x, y, z, cmp);
+	VAR *ptr = array + FUNC(crum_median_of_three)(array, x, y, z, cmp);
+	VAR t = array[nmemb - 1]; array[nmemb - 1] = *ptr; *ptr = t;
+	return 1;
 }
 
 // As per suggestion by Marshall Lochbaum to improve generic data handling
@@ -316,40 +318,41 @@ void FUNC(fulcrum_partition)(VAR *array, VAR *swap, size_t swap_size, size_t nme
 		if (nmemb<=(1<<16) && range<(1<<16)) return radpack32(array, nmemb, array[-1]);
 #endif
 
-		VAR *ptp;
+		size_t npiv;
 		if (nmemb <= 2048)
 		{
-			ptp = FUNC(crum_median_of_nine)(array, nmemb, cmp);
+			npiv = FUNC(crum_median_of_nine)(array, nmemb, cmp);
 		}
 		else
 		{
-			ptp = FUNC(crum_median_of_sqrt)(array, swap, swap_size, nmemb, cmp);
+			npiv = FUNC(crum_sort_sqrt)(array, swap, swap_size, nmemb, cmp);
 		}
-		VAR piv = *ptp;
 
-		// Put pivot at the end for partitioning
-		nmemb--;
-		VAR *end = array + nmemb;
-		*ptp = *end; *end = piv;
+		// Pivot candidates are at the end
+		size_t npart = nmemb - npiv; // Number to be partitioned
+		VAR *pcp = array + npart;    // Pivot candidates position
+		VAR piv = pcp[npiv / 2];
 
 		size_t a_size, s_size;
 
-		if (cmp(end+1, end) <= 0)
+		if (cmp(array + nmemb, &piv) <= 0)
 		{
-			s_size = 0;
+			a_size = npart;
 		}
 		else
 		{
-			a_size = FUNC(fulcrum_default_partition)(array, swap, array, &piv, swap_size, nmemb, cmp);
-			s_size = nmemb - a_size;
+			a_size = FUNC(fulcrum_default_partition)(array, swap, array, &piv, swap_size, npart, cmp);
 		}
 
-		if (s_size == 0)
+		if (a_size == npart)
 		{
-			a_size = FUNC(fulcrum_reverse_partition)(array, swap, array, &piv, swap_size, nmemb, cmp);
-			s_size = nmemb - a_size;
+			a_size = FUNC(fulcrum_reverse_partition)(array, swap, array, &piv, swap_size, npart, cmp);
+			while (cmp(&piv, pcp) > 0)
+			{
+				VAR t = array[a_size]; array[a_size++] = *pcp; *pcp++ = t;
+			}
 
-			if (s_size <= a_size / 16 || a_size <= CRUM_OUT)
+			if (pcp - (array + a_size) <= a_size / 16 || a_size <= CRUM_OUT)
 			{
 				return FUNC(quadsort_swap)(array, swap, swap_size, a_size, cmp);
 			}
@@ -359,17 +362,23 @@ void FUNC(fulcrum_partition)(VAR *array, VAR *swap, size_t swap_size, size_t nme
 			}
 		}
 
-		// Swap pivot back to the middle
-		ptp = array + a_size; *end = *ptp; *ptp = piv;
-		nmemb++;
+		// Swap candidates <= pivot to the middle
+		// Unguarded because case above handles pivot == element after end
+		while (cmp(pcp, &piv) <= 0)
+		{
+			VAR t = array[a_size]; array[a_size++] = *pcp; *pcp++ = t;
+		}
+		pcp = array + a_size;
+		s_size = nmemb - a_size;
+		a_size--; // Exclude a pivot
 
 		if (a_size <= s_size / 16 || s_size <= CRUM_OUT)
 		{
-			FUNC(quadsort_swap)(ptp + 1, swap, swap_size, s_size, cmp);
+			FUNC(quadsort_swap)(pcp, swap, swap_size, s_size, cmp);
 		}
 		else
 		{
-			FUNC(fulcrum_partition)(ptp + 1, swap, swap_size, s_size, cmp);
+			FUNC(fulcrum_partition)(pcp, swap, swap_size, s_size, cmp);
 		}
 
 		if (s_size <= a_size / 16 || a_size <= CRUM_OUT)
