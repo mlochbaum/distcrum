@@ -85,25 +85,27 @@ size_t FUNC(crum_analyze)(VAR *array, VAR *swap, size_t swap_size, size_t nmemb,
 	return 0;
 }
 
-size_t FUNC(crum_sort_sqrt)(VAR *array, VAR *swap, size_t swap_size, size_t nmemb, CMPFUNC *cmp)
+size_t FUNC(crum_sort_sqrt)(VAR *array, VAR *swap, size_t swap_size, size_t nmemb, size_t npiv, CMPFUNC *cmp)
 {
 	VAR *ptx, *pta, *pts;
 	size_t log2, nt, div, cnt, i;
 	unsigned seed, mask;
+	nmemb -= npiv;
 	pts = ptx = array + nmemb;
 
 	// Set log2 to 1 + floor(log2(nmemb))
 	log2 = 11;
 	for (nt = nmemb >> log2 ; nt ; nt /= 2) log2++;
 
-	// Set div to about sqrt(2 * nmemb * (2 + log2))
-	nt = (nmemb / 128) * (2 + log2); // Divide by 256 for overflow
-	div = 1 << (3 + log2 / 2);
-	for (i = 0 ; i < 5 ; i++) div = (div + nt / div) / 2;
-	div *= 16;
+	// Set cnt to about sqrt(nt), number of pivots wanted
+	nt = nmemb / (2 + log2);
+	cnt = 1 << (log2 / 2 - 3);
+	for (i = 0 ; i < 5 ; i++) cnt = (cnt + nt / cnt) / 2;
+	if (cnt <= npiv) return npiv;
+	div = 1 + nmemb / (cnt - npiv);
 
 	seed = nmemb;
-	mask = (1 << (2 + log2 / 2)) - 1;  // < div
+	mask = (1 << (1 + log2 / 2)) - 1;  // < div
 	for (i = nmemb ; i >= 3 * div ; )
 	{
 		i -= div; pts--;
@@ -117,9 +119,10 @@ size_t FUNC(crum_sort_sqrt)(VAR *array, VAR *swap, size_t swap_size, size_t nmem
 		pta = array + i + (seed & mask); swap[0] = *pts; *pts = *pta; *pta = swap[0];
 	}
 	cnt = ptx - pts;
-	FUNC(quadsort_swap)(pts, swap, swap_size, cnt, cmp);
+	FUNC(quadsort_swap)(pts, swap, swap_size, cnt + npiv, cmp);
+//	if (npiv) FUNC(blit_merge_block)(pts, swap, swap_size, cnt, npiv, cmp);
 
-	return cnt;
+	return cnt + npiv;
 }
 
 size_t FUNC(crum_median_of_three)(VAR *array, size_t v0, size_t v1, size_t v2, CMPFUNC *cmp)
@@ -309,7 +312,7 @@ size_t FUNC(fulcrum_default_partition)(VAR *array, VAR *swap, VAR *ptx, VAR *piv
 	return m;
 }
 
-void FUNC(fulcrum_partition)(VAR *array, VAR *swap, size_t swap_size, size_t nmemb, CMPFUNC *cmp)
+void FUNC(fulcrum_partition)(VAR *array, VAR *swap, size_t swap_size, size_t nmemb, size_t npiv, CMPFUNC *cmp)
 {
 	while (1)
 	{
@@ -318,14 +321,13 @@ void FUNC(fulcrum_partition)(VAR *array, VAR *swap, size_t swap_size, size_t nme
 		if (nmemb<=(1<<16) && range<(1<<16)) return radpack32(array, nmemb, array[-1]);
 #endif
 
-		size_t npiv;
 		if (nmemb <= 2048)
 		{
 			npiv = FUNC(crum_median_of_nine)(array, nmemb, cmp);
 		}
 		else
 		{
-			npiv = FUNC(crum_sort_sqrt)(array, swap, swap_size, nmemb, cmp);
+			npiv = FUNC(crum_sort_sqrt)(array, swap, swap_size, nmemb, npiv, cmp);
 		}
 
 		// Pivot candidates are at the end
@@ -347,6 +349,7 @@ void FUNC(fulcrum_partition)(VAR *array, VAR *swap, size_t swap_size, size_t nme
 		if (a_size == npart)
 		{
 			a_size = FUNC(fulcrum_reverse_partition)(array, swap, array, &piv, swap_size, npart, cmp);
+			size_t a0 = a_size;
 			while (cmp(&piv, pcp) > 0)
 			{
 				VAR t = array[a_size]; array[a_size++] = *pcp; *pcp++ = t;
@@ -358,7 +361,7 @@ void FUNC(fulcrum_partition)(VAR *array, VAR *swap, size_t swap_size, size_t nme
 			}
 			else
 			{
-				return FUNC(fulcrum_partition)(array, swap, swap_size, a_size, cmp);
+				return FUNC(fulcrum_partition)(array, swap, swap_size, a_size, a_size - a0, cmp);
 			}
 		}
 
@@ -368,9 +371,11 @@ void FUNC(fulcrum_partition)(VAR *array, VAR *swap, size_t swap_size, size_t nme
 		{
 			VAR t = array[a_size]; array[a_size++] = *pcp; *pcp++ = t;
 		}
+		VAR s_piv = (array + nmemb) - pcp;
+		npiv -= s_piv;
 		pcp = array + a_size;
 		s_size = nmemb - a_size;
-		a_size--; // Exclude a pivot
+		a_size--; npiv--; // Exclude a pivot
 
 		if (a_size <= s_size / 16 || s_size <= CRUM_OUT)
 		{
@@ -378,7 +383,7 @@ void FUNC(fulcrum_partition)(VAR *array, VAR *swap, size_t swap_size, size_t nme
 		}
 		else
 		{
-			FUNC(fulcrum_partition)(pcp, swap, swap_size, s_size, cmp);
+			FUNC(fulcrum_partition)(pcp, swap, swap_size, s_size, s_piv, cmp);
 		}
 
 		if (s_size <= a_size / 16 || a_size <= CRUM_OUT)
@@ -447,7 +452,7 @@ void FUNC(crumsort_main)(VAR *array, VAR *swap, size_t swap_size, size_t nmemb, 
 	if (FUNC(crum_range)(array, nmemb, cmp)) return;
 	array++; nmemb-=2;
 
-	FUNC(fulcrum_partition)(array, swap, swap_size, nmemb, cmp);
+	FUNC(fulcrum_partition)(array, swap, swap_size, nmemb, 0, cmp);
 
 }
 
