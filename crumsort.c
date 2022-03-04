@@ -378,14 +378,22 @@ void FUNC(fulcrum_partition)(VAR *array, VAR *swap, size_t swap_size, size_t nme
 			}
 		}
 
-		// Swap candidates <= pivot to the middle
-		// Unguarded because case above handles pivot == element after end
-		while (cmp(pcp, &piv) <= 0)
+		VAR s_piv = 0;
+		if (npiv == 1)
 		{
 			VAR t = array[a_size]; array[a_size++] = *pcp; *pcp++ = t;
 		}
-		VAR s_piv = (array + nmemb) - pcp;
-		npiv -= s_piv;
+		else
+		{
+			// Swap candidates <= pivot to the middle
+			// Unguarded because case above handles pivot == element after end
+			while (cmp(pcp, &piv) <= 0)
+			{
+				VAR t = array[a_size]; array[a_size++] = *pcp; *pcp++ = t;
+			}
+			s_piv = (array + nmemb) - pcp;
+			npiv -= s_piv;
+		}
 		pcp = array + a_size;
 		s_size = nmemb - a_size;
 		a_size--; npiv--; // Exclude a pivot
