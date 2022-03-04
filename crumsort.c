@@ -119,10 +119,23 @@ size_t FUNC(crum_sort_sqrt)(VAR *array, VAR *swap, size_t swap_size, size_t nmem
 		pta = array + i + (seed & mask); swap[0] = *pts; *pts = *pta; *pta = swap[0];
 	}
 	cnt = ptx - pts;
-	FUNC(quadsort_swap)(pts, swap, swap_size, cnt + npiv, cmp);
-//	if (npiv) FUNC(blit_merge_block)(pts, swap, swap_size, cnt, npiv, cmp);
+	npiv += cnt;
+	// Round up to next power of 2 if blit_merge_block will be used
+	if (cnt < npiv && cnt > swap_size)
+	{
+		cnt--;
+		cnt|=cnt>>16; cnt|=cnt>>8; cnt|=cnt>>4; cnt|=cnt>>2; cnt|=cnt>>1;
+		cnt++;
+		if (cnt > npiv) cnt = npiv;
+	}
+	FUNC(quadsort_swap)(pts, swap, swap_size, cnt, cmp);
+	if (cnt < npiv)
+	{
+		if (cnt <= swap_size) FUNC(partial_forward_merge)(pts, swap, npiv, cnt, cmp);
+		else FUNC(blit_merge_block)(pts, swap, swap_size, cnt, npiv - cnt, cmp);
+	}
 
-	return cnt + npiv;
+	return npiv;
 }
 
 size_t FUNC(crum_median_of_three)(VAR *array, size_t v0, size_t v1, size_t v2, CMPFUNC *cmp)
