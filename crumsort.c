@@ -98,14 +98,14 @@ size_t FUNC(crum_sort_sqrt)(VAR *array, VAR *swap, size_t swap_size, size_t nmem
 	for (nt = nmemb >> log2 ; nt ; nt /= 2) log2++;
 
 	// Set cnt to about sqrt(nt), number of pivots wanted
-	nt = nmemb / (2 + log2);
-	cnt = 1 << (log2 / 2 - 3);
+	nt = nmemb;
+	cnt = 1 << (log2 / 2);
 	for (i = 0 ; i < 5 ; i++) cnt = (cnt + nt / cnt) / 2;
 	if (cnt <= npiv) return npiv;
 	div = 1 + nmemb / (cnt - npiv);
 
 	seed = nmemb;
-	mask = (1 << (1 + log2 / 2)) - 1;  // < div
+	mask = (1 << (log2 / 2 - 1)) - 1;  // < div
 	for (i = nmemb ; i >= 3 * div ; )
 	{
 		i -= div; pts--;
@@ -325,6 +325,10 @@ size_t FUNC(fulcrum_default_partition)(VAR *array, VAR *swap, VAR *ptx, VAR *piv
 	return m;
 }
 
+#ifdef IS32
+#include "rhsort.c"
+#endif
+
 void FUNC(fulcrum_partition)(VAR *array, VAR *swap, size_t swap_size, size_t nmemb, size_t npiv, CMPFUNC *cmp)
 {
 	while (1)
@@ -341,6 +345,9 @@ void FUNC(fulcrum_partition)(VAR *array, VAR *swap, size_t swap_size, size_t nme
 		else
 		{
 			npiv = FUNC(crum_sort_sqrt)(array, swap, swap_size, nmemb, npiv, cmp);
+#ifdef IS32
+			if (FUNC(rh_sort)(array, nmemb, swap, swap_size, npiv, cmp)) return;
+#endif
 		}
 
 		// Pivot candidates are at the end

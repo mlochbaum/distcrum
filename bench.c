@@ -71,6 +71,11 @@ static void sort32(T *x, U n) {
   free(aux);
 #elif PDQSORT
   pdqsort(x, x+n);
+#elif MEM
+  U na = 1<<18; if (2*n<na) na=2*n;
+  T *aux = malloc(na*sizeof(T));
+  crumsort_swap32(x, aux, na, n, NULL);
+  free(aux);
 #else
   crumsort32(x, n, NULL);
 #endif
