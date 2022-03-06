@@ -325,17 +325,22 @@ size_t FUNC(fulcrum_default_partition)(VAR *array, VAR *swap, VAR *ptx, VAR *piv
 	return m;
 }
 
-#ifdef IS32
-#include "rhsort.c"
-#endif
-
 void FUNC(fulcrum_partition)(VAR *array, VAR *swap, size_t swap_size, size_t nmemb, size_t npiv, CMPFUNC *cmp)
 {
 	while (1)
 	{
 #ifdef IS32
 		unsigned int range = array[nmemb]-array[-1];
-		if (nmemb<=(1<<16) && range<(1<<16)) return radpack32(array, nmemb, array[-1]);
+
+		if (range/4 < nmemb && range < swap_size*sizeof(VAR)/sizeof(size_t))
+		{
+			return count_sort(array, nmemb, (size_t*)swap, array[-1], range + 1);
+		}
+
+		if (nmemb <= (1<<16) && range < (1<<16))
+		{
+			return radpack32(array, nmemb, array[-1]);
+		}
 #endif
 
 		if (nmemb <= 2048)

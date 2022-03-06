@@ -106,6 +106,8 @@ typedef int CMPFUNC (const void *a, const void *b);
 
 #define IS32
 #include "radix.c"
+#include "count.c"
+#include "rhsort.c"
 #include "crumsort.c"
 #undef IS32
 

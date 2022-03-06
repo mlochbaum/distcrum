@@ -1,5 +1,6 @@
 #include <stdint.h>
 
+typedef size_t U;
 void radpack32(int *x32, U n, int min) {
   uint16_t *x16 = (uint16_t*)x32;
   uint16_t *aux = x16 + n;
