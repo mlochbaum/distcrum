@@ -28,9 +28,9 @@ int FUNC(rh_sort)(T *x, U n, T *aux, U na, U npiv, CMPFUNC *cmp) {
   if (sz>na) return 0;                  // Not enough space
   #define POS(E) ((U)(UT)((E)-min) >> sh)
   // Statistical check to make sure it's not too clumpy
-  for (U i=n-npiv+1, prev=POS(i-1), score=0; i<n; i++) {
-    U next=POS(i), d=next-prev; prev=next;
-    if (d<16) { score+=d; if (score>=npiv) return 0; }
+  for (U i=n-npiv+1, prev=POS(x[i-1]), score=0; i<n; i++) {
+    U next=POS(x[i]), d=next-prev; prev=next;
+    if (d<16) { score+=16-d; if (score>=60+npiv/6) return 0; }
   }
 
   // Allocate buffer, and fill with sentinels
