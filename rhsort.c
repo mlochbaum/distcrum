@@ -15,6 +15,7 @@ static const U BLOCK = 16;
 // Last npiv values of x are pivot candidates
 int FUNC(rh_sort)(T *x, U n, T *aux, U na, U npiv, CMPFUNC *cmp) {
   if (n > 1<<16) return 0;              // Partitioning is better
+  if (2*n+n/2 > na) return 0;           // Not enough space, quick rejection
 
   // Find the range.
   T min=x[-1], max=x[n];

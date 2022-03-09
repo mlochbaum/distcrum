@@ -350,10 +350,10 @@ void FUNC(fulcrum_partition)(VAR *array, VAR *swap, size_t swap_size, size_t nme
 		else
 		{
 			npiv = FUNC(crum_sort_sqrt)(array, swap, swap_size, nmemb, npiv, cmp);
-#ifdef IS32
-			if (FUNC(rh_sort)(array, nmemb, swap, swap_size, npiv, cmp)) return;
-#endif
 		}
+#ifdef IS32
+		if (nmemb>64 && FUNC(rh_sort)(array, nmemb, swap, swap_size, npiv, cmp)) return;
+#endif
 
 		// Pivot candidates are at the end
 		size_t npart = nmemb - npiv; // Number to be partitioned
