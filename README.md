@@ -1,6 +1,8 @@
 # Distribution crumsort
 
-This repository contains an in-progress effort to give [crumsort](https://github.com/scandum/crumsort) access to powerful distribution sorting algorithms when possible. Currently only 4-byte sorting has been augmented in this way. The following methods are used:
+The ideas here have been incorporated into [Singeli sort](https://github.com/mlochbaum/SingeliSort), and this repository won't be developed further.
+
+What was it? An experiment to give [crumsort](https://github.com/scandum/crumsort) access to powerful distribution sorting algorithms. 4-byte sorting was augmented with the following methods:
 
 | Method                                                             | Memory       | Requires     | Top speed | Adaptive
 |--------------------------------------------------------------------|--------------|--------------|-----------|---------
